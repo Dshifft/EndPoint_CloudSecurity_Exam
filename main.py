@@ -2,6 +2,9 @@
 
 from fastapi import FastAPI
 
+from src.models import Account, TokenSession, Transfer, User
+from utils.db import Base, Engine
+
 
 banking_app = FastAPI(
     title="Banking API",
@@ -10,6 +13,12 @@ banking_app = FastAPI(
     docs_url="/mc101-docs",
     redoc_url=None,
 )
+
+
+@banking_app.on_event("startup")
+def create_database_tables() -> None:
+    """Create the database tables when the API starts."""
+    Base.metadata.create_all(bind=Engine)
 
 
 @banking_app.get("/", tags=["health"])
