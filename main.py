@@ -1,0 +1,18 @@
+"""FastAPI application entry point for the banking service."""
+
+from fastapi import FastAPI
+
+
+banking_app = FastAPI(
+    title="Banking API",
+    description="REST API for users, accounts and transfers.",
+    version="0.1.0",
+    docs_url="/mc101-docs",
+    redoc_url=None,
+)
+
+
+@banking_app.get("/", tags=["health"])
+def read_root() -> dict[str, str]:
+    """Confirm that the banking API is running."""
+    return {"message": "Banking API is running."}
