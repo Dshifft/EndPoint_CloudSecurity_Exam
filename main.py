@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 
 from src.models import Account, TokenSession, Transfer, User
+from src.user.userEndpoints import user_router
 from utils.db import Base, Engine
 
 
@@ -13,6 +14,8 @@ banking_app = FastAPI(
     docs_url="/mc101-docs",
     redoc_url=None,
 )
+
+banking_app.include_router(user_router)
 
 
 @banking_app.on_event("startup")

@@ -1,0 +1,6 @@
+.git/
+__pycache__/
+*.py[cod]
+0_work/
+logs/
+.env
