@@ -2,6 +2,7 @@
 
 from hashlib import sha256
 
+from cryptography.fernet import Fernet
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -42,6 +43,18 @@ def generate_user_jwt(payload: UserJWTPayload) -> str:
 def get_token_fingerprint(token: str) -> str:
     """Return a one-way fingerprint used to store a token session safely."""
     return sha256(token.encode("utf-8")).hexdigest()
+
+
+def encrypt_transfer_note(note: str) -> str:
+    """Encrypt a transfer note before storing it in PostgreSQL."""
+    cipher = Fernet(settings.NOTE_ENCRYPTION_KEY.get_secret_value().encode("utf-8"))
+    return cipher.encrypt(note.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_transfer_note(encrypted_note: str) -> str:
+    """Decrypt a transfer note before returning it to its creator."""
+    cipher = Fernet(settings.NOTE_ENCRYPTION_KEY.get_secret_value().encode("utf-8"))
+    return cipher.decrypt(encrypted_note.encode("utf-8")).decode("utf-8")
 
 
 def validate_user_jwt_token(

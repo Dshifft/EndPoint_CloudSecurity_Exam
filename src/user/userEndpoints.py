@@ -149,7 +149,7 @@ def update_user(
     """Update the authenticated user's address, password or both."""
     user = get_owned_user(user_id, payload, db)
     if user_update_data.address is None and user_update_data.password is None:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No update data was supplied.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No update data was supplied.")
     if user_update_data.address is not None:
         user.address = user_update_data.address
     if user_update_data.password is not None:

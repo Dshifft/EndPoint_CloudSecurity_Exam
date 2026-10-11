@@ -9,3 +9,5 @@ class Endpoints:
     LOGIN = "/login"
     LOGOUT = "/logout"
     LOGIN_VALIDATION = "/login-validation"
+    ACCOUNTS = "/accounts"
+    TRANSFERS = "/transfers"
