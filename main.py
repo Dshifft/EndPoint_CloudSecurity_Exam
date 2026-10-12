@@ -10,7 +10,10 @@ from utils.db import Base, Engine
 
 banking_app = FastAPI(
     title="Banking API",
-    description="REST API for users, accounts and transfers.",
+    description=(
+        "REST API for user authentication, user-owned accounts, balance adjustments, "
+        "and encrypted transfer notes. Protected endpoints require a bearer JWT."
+    ),
     version="0.1.0",
     docs_url="/mc101-docs",
     redoc_url=None,
@@ -26,7 +29,16 @@ def create_database_tables() -> None:
     Base.metadata.create_all(bind=Engine)
 
 
-@banking_app.get("/", tags=["health"])
+@banking_app.get(
+    "/",
+    tags=["health"],
+    summary="Check API availability",
+    description="Returns a simple confirmation that the API process is running.",
+    response_description="API availability message.",
+)
 def read_root() -> dict[str, str]:
-    """Confirm that the banking API is running."""
+    """Confirm that the API process is running.
+
+    Input: none. Output: a short availability message.
+    """
     return {"message": "Banking API is running."}

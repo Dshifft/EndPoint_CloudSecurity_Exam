@@ -50,12 +50,25 @@ def get_owned_account(
     return account
 
 
-@account_router.post(Endpoints.ACCOUNTS, status_code=status.HTTP_201_CREATED, response_model=AccountResponse)
+@account_router.post(
+    Endpoints.ACCOUNTS,
+    status_code=status.HTTP_201_CREATED,
+    response_model=AccountResponse,
+    summary="Create an account",
+    description="Creates a new account for the bearer-token owner with a balance of 0.00.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "The bearer token is missing, invalid, or revoked."},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "The account could not be created."},
+    },
+)
 def create_account(
     payload: UserJWTPayload = Depends(validate_user_jwt_token),
     db: Session = Depends(get_db),
 ) -> AccountResponse:
-    """Create an account for the authenticated user with a zero balance."""
+    """Create a zero-balance account for the token holder.
+
+    Input: a valid bearer token. Output: the created account with its initial balance.
+    """
     account = Account(user_id=payload.user_id, balance=Decimal("0.00"))
     db.add(account)
     try:
@@ -67,34 +80,73 @@ def create_account(
     return get_account_response(account)
 
 
-@account_router.get(Endpoints.ACCOUNTS, response_model=list[AccountResponse])
+@account_router.get(
+    Endpoints.ACCOUNTS,
+    response_model=list[AccountResponse],
+    summary="List owned accounts",
+    description="Returns every account owned by the bearer-token owner.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "The bearer token is missing, invalid, or revoked."},
+    },
+)
 def get_accounts(
     payload: UserJWTPayload = Depends(validate_user_jwt_token),
     db: Session = Depends(get_db),
 ) -> list[AccountResponse]:
-    """Return every account owned by the authenticated user."""
+    """Return every account owned by the token holder.
+
+    Input: a valid bearer token. Output: a list of the user's accounts and balances.
+    """
     accounts = db.query(Account).filter(Account.user_id == payload.user_id).all()
     return [get_account_response(account) for account in accounts]
 
 
-@account_router.get(f"{Endpoints.ACCOUNTS}/{{account_id}}", response_model=AccountResponse)
+@account_router.get(
+    f"{Endpoints.ACCOUNTS}/{{account_id}}",
+    response_model=AccountResponse,
+    summary="Get one account",
+    description="Returns an account only when it belongs to the bearer-token owner.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "The bearer token is missing, invalid, or revoked."},
+        status.HTTP_403_FORBIDDEN: {"description": "The requested account belongs to a different user."},
+        status.HTTP_404_NOT_FOUND: {"description": "The account does not exist."},
+    },
+)
 def get_account(
     account_id: int,
     payload: UserJWTPayload = Depends(validate_user_jwt_token),
     db: Session = Depends(get_db),
 ) -> AccountResponse:
-    """Return one account when it belongs to the authenticated user."""
+    """Return an account owned by the token holder.
+
+    Input: account ID and a valid bearer token. Output: the requested account and balance.
+    """
     return get_account_response(get_owned_account(account_id, payload, db))
 
 
-@account_router.patch(f"{Endpoints.ACCOUNTS}/{{account_id}}", response_model=AccountResponse)
+@account_router.patch(
+    f"{Endpoints.ACCOUNTS}/{{account_id}}",
+    response_model=AccountResponse,
+    summary="Adjust an account balance",
+    description="Deposits a positive amount or withdraws a negative amount without allowing a negative final balance.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "The bearer token is missing, invalid, or revoked."},
+        status.HTTP_403_FORBIDDEN: {"description": "The requested account belongs to a different user."},
+        status.HTTP_404_NOT_FOUND: {"description": "The account does not exist."},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "The amount is invalid or would make the balance negative."},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "The account could not be updated."},
+    },
+)
 def update_account_balance(
     account_id: int,
     account_update_data: AccountBalanceUpdateData,
     payload: UserJWTPayload = Depends(validate_user_jwt_token),
     db: Session = Depends(get_db),
 ) -> AccountResponse:
-    """Deposit or withdraw funds without allowing a negative final balance."""
+    """Adjust an account balance without allowing an overdraft.
+
+    Input: account ID, valid bearer token, and a non-zero amount. Output: the account with its new balance.
+    """
     account = get_owned_account(account_id, payload, db, lock=True)
     new_balance = account.balance + account_update_data.amount
     if new_balance < Decimal("0.00"):
@@ -109,13 +161,27 @@ def update_account_balance(
     return get_account_response(account)
 
 
-@account_router.delete(f"{Endpoints.ACCOUNTS}/{{account_id}}", status_code=status.HTTP_204_NO_CONTENT)
+@account_router.delete(
+    f"{Endpoints.ACCOUNTS}/{{account_id}}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an account",
+    description="Deletes an account owned by the bearer-token owner, even when it has a remaining balance.",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "The bearer token is missing, invalid, or revoked."},
+        status.HTTP_403_FORBIDDEN: {"description": "The requested account belongs to a different user."},
+        status.HTTP_404_NOT_FOUND: {"description": "The account does not exist."},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "The account could not be deleted."},
+    },
+)
 def delete_account(
     account_id: int,
     payload: UserJWTPayload = Depends(validate_user_jwt_token),
     db: Session = Depends(get_db),
 ) -> Response:
-    """Delete an account owned by the authenticated user."""
+    """Delete an account owned by the token holder.
+
+    Input: account ID and a valid bearer token. Output: no response body after deletion.
+    """
     account = get_owned_account(account_id, payload, db)
     db.delete(account)
     try:
@@ -126,13 +192,33 @@ def delete_account(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@account_router.post(Endpoints.TRANSFERS, status_code=status.HTTP_201_CREATED, response_model=TransferResponse)
+@account_router.post(
+    Endpoints.TRANSFERS,
+    status_code=status.HTTP_201_CREATED,
+    response_model=TransferResponse,
+    summary="Transfer funds between accounts",
+    description=(
+        "Atomically debits an owned source account, credits an existing different destination account, "
+        "and stores the transfer note encrypted."
+    ),
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "The bearer token is missing, invalid, or revoked."},
+        status.HTTP_403_FORBIDDEN: {"description": "The source account belongs to a different user."},
+        status.HTTP_404_NOT_FOUND: {"description": "A source or destination account does not exist."},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "The amount is invalid, the accounts match, or the source balance is insufficient."},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": "The transfer could not be persisted."},
+    },
+)
 def create_transfer(
     transfer_data: TransferCreateData,
     payload: UserJWTPayload = Depends(validate_user_jwt_token),
     db: Session = Depends(get_db),
 ) -> TransferResponse:
-    """Atomically transfer funds and store only an encrypted transfer note."""
+    """Transfer funds atomically and return the note in decrypted form.
+
+    Input: source account ID, destination account ID, positive amount, note, and valid bearer token.
+    Output: the created transfer with the note decrypted only for this response.
+    """
     if transfer_data.source_account_id == transfer_data.destination_account_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Accounts must be different.")
 
