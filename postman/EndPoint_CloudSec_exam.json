@@ -1,0 +1,361 @@
+{
+  "info": {
+    "_postman_id": "1e7dbd4d-97f1-42d5-9c5f-663d3ec8f662",
+    "name": "Banking API - Complete Suite",
+    "description": "Run requests in order with the Collection Runner using a 150 ms delay and disabled SSL certificate verification for the local self-signed certificate. The suite creates a temporary user and deletes it in the final request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "user_email", "value": "" },
+    { "key": "user_password", "value": "" },
+    { "key": "user_id", "value": "" },
+    { "key": "access_token", "value": "" },
+    { "key": "source_account_id", "value": "" },
+    { "key": "destination_account_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Register user",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('user_email', `postman-${Date.now()}@example.com`);",
+              "pm.collectionVariables.set('user_password', 'password123');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status is 201 and save the user ID', () => {",
+              "  pm.response.to.have.status(201);",
+              "  const user = pm.response.json();",
+              "  pm.collectionVariables.set('user_id', user.user_id);",
+              "  pm.expect(user).not.to.have.property('hashed_password');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Postman User\",\n  \"address\": \"Initial address\",\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+        },
+        "url": "https://localhost/users"
+      }
+    },
+    {
+      "name": "2. Login",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and save the bearer token', () => {",
+        "  pm.response.to.have.status(200);",
+        "  const login = pm.response.json();",
+        "  pm.collectionVariables.set('access_token', login.access_token);",
+        "  pm.expect(login.token_type).to.eql('bearer');",
+        "});"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}" },
+        "url": "https://localhost/login"
+      }
+    },
+    {
+      "name": "3. Validate login",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the authenticated user is returned', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(pm.response.json().user_id).to.eql(Number(pm.collectionVariables.get('user_id')));",
+        "});"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/login-validation"
+      }
+    },
+    {
+      "name": "4. Get own user",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/users/{{user_id}}"
+      }
+    },
+    {
+      "name": "5. Update own user",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the address is updated', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(pm.response.json().address).to.eql('Updated address');",
+        "});"
+      ]}}],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"address\": \"Updated address\"\n}" },
+        "url": "https://localhost/users/{{user_id}}"
+      }
+    },
+    {
+      "name": "6. Create source account",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 201 and the source account starts at zero', () => {",
+        "  pm.response.to.have.status(201);",
+        "  const account = pm.response.json();",
+        "  pm.collectionVariables.set('source_account_id', account.account_id);",
+        "  pm.expect(Number(account.balance)).to.eql(0);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts"
+      }
+    },
+    {
+      "name": "7. Create destination account",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 201 and save the destination account ID', () => {",
+        "  pm.response.to.have.status(201);",
+        "  pm.collectionVariables.set('destination_account_id', pm.response.json().account_id);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts"
+      }
+    },
+    {
+      "name": "8. List own accounts",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and both accounts are listed', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(pm.response.json()).to.have.length(2);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts"
+      }
+    },
+    {
+      "name": "9. Get source account",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the account belongs to the user', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(pm.response.json().account_id).to.eql(Number(pm.collectionVariables.get('source_account_id')));",
+        "});"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts/{{source_account_id}}"
+      }
+    },
+    {
+      "name": "10. Deposit into source account",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the balance is 100', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(Number(pm.response.json().balance)).to.eql(100);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"amount\": 100\n}" },
+        "url": "https://localhost/accounts/{{source_account_id}}"
+      }
+    },
+    {
+      "name": "11. Withdraw from source account",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the balance is 90', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(Number(pm.response.json().balance)).to.eql(90);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"amount\": -10\n}" },
+        "url": "https://localhost/accounts/{{source_account_id}}"
+      }
+    },
+    {
+      "name": "12. Transfer funds",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 201 and the note is returned decrypted', () => {",
+        "  pm.response.to.have.status(201);",
+        "  const transfer = pm.response.json();",
+        "  pm.expect(Number(transfer.amount)).to.eql(30);",
+        "  pm.expect(transfer.note).to.eql('Private transfer note');",
+        "});"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"source_account_id\": {{source_account_id}},\n  \"destination_account_id\": {{destination_account_id}},\n  \"amount\": 30,\n  \"note\": \"Private transfer note\"\n}" },
+        "url": "https://localhost/transfers"
+      }
+    },
+    {
+      "name": "13. Verify source balance after transfer",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the balance is 60', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(Number(pm.response.json().balance)).to.eql(60);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts/{{source_account_id}}"
+      }
+    },
+    {
+      "name": "14. Verify destination balance after transfer",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the balance is 30', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(Number(pm.response.json().balance)).to.eql(30);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts/{{destination_account_id}}"
+      }
+    },
+    {
+      "name": "15. Reject insufficient transfer",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 422', () => pm.response.to.have.status(422));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"source_account_id\": {{source_account_id}},\n  \"destination_account_id\": {{destination_account_id}},\n  \"amount\": 61,\n  \"note\": \"Rejected note\"\n}" },
+        "url": "https://localhost/transfers"
+      }
+    },
+    {
+      "name": "16. Reject transfer to the same account",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 422', () => pm.response.to.have.status(422));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"source_account_id\": {{source_account_id}},\n  \"destination_account_id\": {{source_account_id}},\n  \"amount\": 1,\n  \"note\": \"Rejected note\"\n}" },
+        "url": "https://localhost/transfers"
+      }
+    },
+    {
+      "name": "17. Verify balances are unchanged after rejected transfers",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the source balance remains 60', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(Number(pm.response.json().balance)).to.eql(60);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts/{{source_account_id}}"
+      }
+    },
+    {
+      "name": "18. Delete destination account",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+      ]}}],
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/accounts/{{destination_account_id}}"
+      }
+    },
+    {
+      "name": "19. Logout",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/logout"
+      }
+    },
+    {
+      "name": "20. Verify revoked token",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/login-validation"
+      }
+    },
+    {
+      "name": "21. Login again",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and save a new bearer token', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.collectionVariables.set('access_token', pm.response.json().access_token);",
+        "});"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}" },
+        "url": "https://localhost/login"
+      }
+    },
+    {
+      "name": "22. Delete own user",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 204 and the temporary data is removed', () => pm.response.to.have.status(204));"
+      ]}}],
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+        "url": "https://localhost/users/{{user_id}}"
+      }
+    }
+  ]
+}
