@@ -30,15 +30,15 @@ def create_database_tables() -> None:
 
 
 @banking_app.get(
-    "/",
+    "/health",
     tags=["health"],
-    summary="Check API availability",
-    description="Returns a simple confirmation that the API process is running.",
-    response_description="API availability message.",
+    summary="Check service health",
+    description="Returns a confirmation that the service is running.",
+    response_description="Service health status.",
 )
-def read_root() -> dict[str, str]:
-    """Confirm that the API process is running.
+def health() -> dict[str, str]:
+    """Confirm that the service is available.
 
-    Input: none. Output: a short availability message.
+    Input: none. Output: the current service status.
     """
-    return {"message": "Banking API is running."}
+    return {"status": "ok"}
