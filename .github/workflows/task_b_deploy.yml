@@ -125,14 +125,33 @@ jobs:
           set -euo pipefail
           printf '%s' "$GHCR_TOKEN" | ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin"
 
-      - name: Transfer runtime configuration only
+      - name: Transfer deployment configuration
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NOTE_ENCRYPTION_KEY: ${{ secrets.NOTE_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
+          : "${POSTGRES_USER:?POSTGRES_USER GitHub Actions secret is required}"
+          : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD GitHub Actions secret is required}"
+          : "${POSTGRES_DB:?POSTGRES_DB GitHub Actions secret is required}"
+          : "${JWT_SECRET:?JWT_SECRET GitHub Actions secret is required}"
+          : "${NOTE_ENCRYPTION_KEY:?NOTE_ENCRYPTION_KEY GitHub Actions secret is required}"
           ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "install -d -m 700 ~/$DEPLOY_DIRECTORY"
-          scp docker-compose.production.yml .env "$AZURE_VM_USER@$AZURE_VM_HOST:~/$DEPLOY_DIRECTORY/"
+          scp docker-compose.production.yml "$AZURE_VM_USER@$AZURE_VM_HOST:~/$DEPLOY_DIRECTORY/"
+          {
+            printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
+            printf 'POSTGRES_HOST=postgres\n'
+            printf 'POSTGRES_PORT=5432\n'
+            printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
+            printf 'NOTE_ENCRYPTION_KEY=%s\n' "$NOTE_ENCRYPTION_KEY"
+          } | ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "umask 077; cat > ~/$DEPLOY_DIRECTORY/.env"
 
       - name: Configure Azure Monitor runtime secret
         env:
