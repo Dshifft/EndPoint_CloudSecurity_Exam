@@ -1,0 +1,148 @@
+name: Task B - Production deployment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+  API_IMAGE: ghcr.io/dshifft/endpoint-cloudsecurity-exam-api
+  NGINX_IMAGE: ghcr.io/dshifft/endpoint-cloudsecurity-exam-nginx
+  BACKUPS_IMAGE: ghcr.io/dshifft/endpoint-cloudsecurity-exam-backups
+  DEPLOY_DIRECTORY: endpoint-cloudsec/exam-runtime
+
+jobs:
+  test:
+    name: Test production images
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ci-test
+      API_IMAGE: endpoint-exam-api
+      NGINX_IMAGE: endpoint-exam-nginx
+      BACKUPS_IMAGE: endpoint-exam-backups
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build --tag endpoint-exam-api:$IMAGE_TAG .
+
+      - name: Build Nginx image
+        run: docker build --tag endpoint-exam-nginx:$IMAGE_TAG ./nginx
+
+      - name: Build backup image
+        run: docker build --tag endpoint-exam-backups:$IMAGE_TAG ./backup
+
+      - name: Start production Compose locally
+        run: docker compose -f docker-compose.production.yml up --detach
+
+      - name: Verify health endpoint
+        run: curl --fail --show-error --silent --insecure --retry 12 --retry-all-errors --retry-delay 2 https://localhost/health
+
+      - name: Verify non-existing endpoint behaviour
+        run: |
+          status_code="$(curl --silent --output /dev/null --write-out '%{http_code}' --insecure https://localhost/non-existing)"
+          test "$status_code" = "404"
+
+      - name: Stop test containers
+        if: always()
+        run: docker compose -f docker-compose.production.yml down
+
+  build_and_deploy:
+    name: Build and deploy production images
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.API_IMAGE }}:${{ github.sha }}
+            ${{ env.API_IMAGE }}:latest
+
+      - name: Build and push Nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./nginx
+          push: true
+          tags: |
+            ${{ env.NGINX_IMAGE }}:${{ github.sha }}
+            ${{ env.NGINX_IMAGE }}:latest
+
+      - name: Build and push backup image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backup
+          push: true
+          tags: |
+            ${{ env.BACKUPS_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKUPS_IMAGE }}:latest
+
+      - name: Configure SSH
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s' "$AZURE_VM_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$AZURE_VM_HOST" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Authenticate the VM to GitHub Container Registry
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin"
+
+      - name: Transfer runtime configuration only
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+        run: |
+          set -euo pipefail
+          ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "install -d -m 700 ~/$DEPLOY_DIRECTORY"
+          scp docker-compose.production.yml .env "$AZURE_VM_USER@$AZURE_VM_HOST:~/$DEPLOY_DIRECTORY/"
+
+      - name: Pull and run images on the VM
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+        run: |
+          set -euo pipefail
+          ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "IMAGE_TAG='$IMAGE_TAG' API_IMAGE='$API_IMAGE' NGINX_IMAGE='$NGINX_IMAGE' BACKUPS_IMAGE='$BACKUPS_IMAGE' DEPLOY_DIRECTORY='$DEPLOY_DIRECTORY' bash -s" <<'REMOTE'
+            set -euo pipefail
+            cd ~/$DEPLOY_DIRECTORY
+            export IMAGE_TAG API_IMAGE NGINX_IMAGE BACKUPS_IMAGE
+            docker compose -f docker-compose.production.yml pull
+            docker compose -f docker-compose.production.yml up --detach --remove-orphans
+            docker compose -f docker-compose.production.yml ps
+          REMOTE
+
+      - name: Verify public health endpoint
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+        run: curl --fail --show-error --silent --insecure --retry 12 --retry-all-errors --retry-delay 5 "https://$AZURE_VM_HOST/health"

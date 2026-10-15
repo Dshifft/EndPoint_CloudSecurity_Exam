@@ -2,7 +2,7 @@ name: endpoint-exam
 
 services:
   api:
-    image: endpoint-exam-api:${IMAGE_TAG:?Set IMAGE_TAG to the image tag to deploy}
+    image: ${API_IMAGE:-endpoint-exam-api}:${IMAGE_TAG:?Set IMAGE_TAG to the image tag to deploy}
     restart: unless-stopped
     env_file:
       - .env
@@ -28,7 +28,7 @@ services:
       retries: 5
 
   nginx:
-    image: endpoint-exam-nginx:${IMAGE_TAG:?Set IMAGE_TAG to the image tag to deploy}
+    image: ${NGINX_IMAGE:-endpoint-exam-nginx}:${IMAGE_TAG:?Set IMAGE_TAG to the image tag to deploy}
     restart: unless-stopped
     ports:
       - "80:80"
@@ -38,7 +38,7 @@ services:
         condition: service_started
 
   backups:
-    image: endpoint-exam-backups:${IMAGE_TAG:?Set IMAGE_TAG to the image tag to deploy}
+    image: ${BACKUPS_IMAGE:-endpoint-exam-backups}:${IMAGE_TAG:?Set IMAGE_TAG to the image tag to deploy}
     restart: unless-stopped
     env_file:
       - .env
