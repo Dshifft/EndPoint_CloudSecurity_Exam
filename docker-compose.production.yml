@@ -6,8 +6,11 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+      - path: .env.monitoring
+        required: false
     environment:
       POSTGRES_HOST: postgres
+      OTEL_SERVICE_NAME: endpoint-cloudsecurity-exam
     expose:
       - "8000"
     depends_on:

@@ -134,6 +134,15 @@ jobs:
           ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "install -d -m 700 ~/$DEPLOY_DIRECTORY"
           scp docker-compose.production.yml .env "$AZURE_VM_USER@$AZURE_VM_HOST:~/$DEPLOY_DIRECTORY/"
 
+      - name: Configure Azure Monitor runtime secret
+        env:
+          APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+        run: |
+          set -euo pipefail
+          printf 'APPLICATIONINSIGHTS_CONNECTION_STRING=%s\n' "$APPLICATIONINSIGHTS_CONNECTION_STRING" | ssh "$AZURE_VM_USER@$AZURE_VM_HOST" "umask 077; cat > ~/$DEPLOY_DIRECTORY/.env.monitoring"
+
       - name: Pull and run images on the VM
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}

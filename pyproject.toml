@@ -16,6 +16,7 @@ passlib = { extras = ["all"], version = "^1.7.4" }
 bcrypt = ">=3.2,<4.1"
 python-jose = "^3.5.0"
 cryptography = "^46.0.5"
+azure-monitor-opentelemetry = "^1.8.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

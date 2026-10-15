@@ -1,6 +1,11 @@
 """FastAPI application entry point for the banking service."""
 
-from fastapi import FastAPI
+from collections.abc import Awaitable, Callable
+import logging
+import os
+
+import fastapi
+from azure.monitor.opentelemetry import configure_azure_monitor
 
 from src.models import Account, TokenSession, Transfer, User
 from src.account.accountEndpoints import account_router
@@ -8,7 +13,14 @@ from src.user.userEndpoints import user_router
 from utils.db import Base, Engine
 
 
-banking_app = FastAPI(
+LOGGER_NAME = "banking_api"
+logger = logging.getLogger(LOGGER_NAME)
+
+if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+    configure_azure_monitor(logger_name=LOGGER_NAME)
+
+
+banking_app = fastapi.FastAPI(
     title="Banking API",
     description=(
         "REST API for user authentication, user-owned accounts, balance adjustments, "
@@ -27,6 +39,32 @@ banking_app.include_router(account_router)
 def create_database_tables() -> None:
     """Create the database tables when the API starts."""
     Base.metadata.create_all(bind=Engine)
+    logger.info("database_tables_ready")
+
+
+@banking_app.middleware("http")
+async def log_request(
+    request: fastapi.Request,
+    call_next: Callable[[fastapi.Request], Awaitable[fastapi.Response]],
+) -> fastapi.Response:
+    """Record request metadata without logging query values or request bodies."""
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "http_request_failed method=%s path=%s",
+            request.method,
+            request.url.path,
+        )
+        raise
+
+    logger.info(
+        "http_request_completed method=%s path=%s status_code=%s",
+        request.method,
+        request.url.path,
+        response.status_code,
+    )
+    return response
 
 
 @banking_app.get(
