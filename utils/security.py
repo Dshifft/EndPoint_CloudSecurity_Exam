@@ -1,5 +1,6 @@
 """Password hashing and JWT validation utilities."""
 
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 
 from cryptography.fernet import Fernet
@@ -36,8 +37,16 @@ def verify_password(password: SecretStr, hashed_password: str) -> bool:
 
 
 def generate_user_jwt(payload: UserJWTPayload) -> str:
-    """Create a signed JWT after successful user authentication."""
-    return jwt.encode(payload.model_dump(), settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+    """Create a signed JWT with a configurable, 24-hour default lifetime."""
+    issued_at = datetime.now(timezone.utc)
+    claims = payload.model_dump()
+    claims.update(
+        {
+            "iat": issued_at,
+            "exp": issued_at + timedelta(hours=settings.JWT_EXPIRE_HOURS),
+        }
+    )
+    return jwt.encode(claims, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
 
 
 def get_token_fingerprint(token: str) -> str:

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_HOURS: int = 24
     NOTE_ENCRYPTION_KEY: SecretStr
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

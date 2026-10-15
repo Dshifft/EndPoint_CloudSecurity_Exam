@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "1e7dbd4d-97f1-42d5-9c5f-663d3ec8f662",
-    "name": "Banking API - Complete Suite",
-    "description": "Run requests in order with the Collection Runner using a 150 ms delay and disabled SSL certificate verification for the local self-signed certificate. The suite creates a temporary user and deletes it in the final request.",
+    "name": "Banking API - Complete Production Suite",
+    "description": "Run requests in order with the Collection Runner against the public production VM using a 150 ms delay and disabled SSL certificate verification for the self-signed certificate. The suite validates the required health and missing-endpoint behaviour, creates a temporary user, exercises the complete API flow, and removes the temporary data in the final request.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,9 +11,24 @@
     { "key": "user_id", "value": "" },
     { "key": "access_token", "value": "" },
     { "key": "source_account_id", "value": "" },
-    { "key": "destination_account_id", "value": "" }
+    { "key": "destination_account_id", "value": "" },
+    { "key": "base_url", "value": "https://135.116.202.172" }
   ],
   "item": [
+    {
+      "name": "0. Production health endpoint",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 200 and the service is healthy', () => {",
+        "  pm.response.to.have.status(200);",
+        "  pm.expect(pm.response.json()).to.have.property('status', 'ok');",
+        "});"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/health"
+      }
+    },
     {
       "name": "1. Register user",
       "event": [
@@ -49,7 +64,7 @@
           "mode": "raw",
           "raw": "{\n  \"name\": \"Postman User\",\n  \"address\": \"Initial address\",\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
         },
-        "url": "https://localhost/users"
+        "url": "{{base_url}}/users"
       }
     },
     {
@@ -66,7 +81,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}" },
-        "url": "https://localhost/login"
+        "url": "{{base_url}}/login"
       }
     },
     {
@@ -80,7 +95,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/login-validation"
+        "url": "{{base_url}}/login-validation"
       }
     },
     {
@@ -91,7 +106,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/users/{{user_id}}"
+        "url": "{{base_url}}/users/{{user_id}}"
       }
     },
     {
@@ -109,7 +124,7 @@
           { "key": "Authorization", "value": "Bearer {{access_token}}" }
         ],
         "body": { "mode": "raw", "raw": "{\n  \"address\": \"Updated address\"\n}" },
-        "url": "https://localhost/users/{{user_id}}"
+        "url": "{{base_url}}/users/{{user_id}}"
       }
     },
     {
@@ -125,7 +140,7 @@
       "request": {
         "method": "POST",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts"
+        "url": "{{base_url}}/accounts"
       }
     },
     {
@@ -139,7 +154,7 @@
       "request": {
         "method": "POST",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts"
+        "url": "{{base_url}}/accounts"
       }
     },
     {
@@ -153,7 +168,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts"
+        "url": "{{base_url}}/accounts"
       }
     },
     {
@@ -167,7 +182,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts/{{source_account_id}}"
+        "url": "{{base_url}}/accounts/{{source_account_id}}"
       }
     },
     {
@@ -185,7 +200,7 @@
           { "key": "Authorization", "value": "Bearer {{access_token}}" }
         ],
         "body": { "mode": "raw", "raw": "{\n  \"amount\": 100\n}" },
-        "url": "https://localhost/accounts/{{source_account_id}}"
+        "url": "{{base_url}}/accounts/{{source_account_id}}"
       }
     },
     {
@@ -203,7 +218,7 @@
           { "key": "Authorization", "value": "Bearer {{access_token}}" }
         ],
         "body": { "mode": "raw", "raw": "{\n  \"amount\": -10\n}" },
-        "url": "https://localhost/accounts/{{source_account_id}}"
+        "url": "{{base_url}}/accounts/{{source_account_id}}"
       }
     },
     {
@@ -223,7 +238,7 @@
           { "key": "Authorization", "value": "Bearer {{access_token}}" }
         ],
         "body": { "mode": "raw", "raw": "{\n  \"source_account_id\": {{source_account_id}},\n  \"destination_account_id\": {{destination_account_id}},\n  \"amount\": 30,\n  \"note\": \"Private transfer note\"\n}" },
-        "url": "https://localhost/transfers"
+        "url": "{{base_url}}/transfers"
       }
     },
     {
@@ -237,7 +252,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts/{{source_account_id}}"
+        "url": "{{base_url}}/accounts/{{source_account_id}}"
       }
     },
     {
@@ -251,7 +266,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts/{{destination_account_id}}"
+        "url": "{{base_url}}/accounts/{{destination_account_id}}"
       }
     },
     {
@@ -266,7 +281,7 @@
           { "key": "Authorization", "value": "Bearer {{access_token}}" }
         ],
         "body": { "mode": "raw", "raw": "{\n  \"source_account_id\": {{source_account_id}},\n  \"destination_account_id\": {{destination_account_id}},\n  \"amount\": 61,\n  \"note\": \"Rejected note\"\n}" },
-        "url": "https://localhost/transfers"
+        "url": "{{base_url}}/transfers"
       }
     },
     {
@@ -281,7 +296,7 @@
           { "key": "Authorization", "value": "Bearer {{access_token}}" }
         ],
         "body": { "mode": "raw", "raw": "{\n  \"source_account_id\": {{source_account_id}},\n  \"destination_account_id\": {{source_account_id}},\n  \"amount\": 1,\n  \"note\": \"Rejected note\"\n}" },
-        "url": "https://localhost/transfers"
+        "url": "{{base_url}}/transfers"
       }
     },
     {
@@ -295,7 +310,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts/{{source_account_id}}"
+        "url": "{{base_url}}/accounts/{{source_account_id}}"
       }
     },
     {
@@ -306,7 +321,7 @@
       "request": {
         "method": "DELETE",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/accounts/{{destination_account_id}}"
+        "url": "{{base_url}}/accounts/{{destination_account_id}}"
       }
     },
     {
@@ -317,7 +332,7 @@
       "request": {
         "method": "POST",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/logout"
+        "url": "{{base_url}}/logout"
       }
     },
     {
@@ -328,7 +343,7 @@
       "request": {
         "method": "GET",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/login-validation"
+        "url": "{{base_url}}/login-validation"
       }
     },
     {
@@ -343,7 +358,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}" },
-        "url": "https://localhost/login"
+        "url": "{{base_url}}/login"
       }
     },
     {
@@ -354,7 +369,18 @@
       "request": {
         "method": "DELETE",
         "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": "https://localhost/users/{{user_id}}"
+        "url": "{{base_url}}/users/{{user_id}}"
+      }
+    },
+    {
+      "name": "23. Production non-existing endpoint",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Status is 404 for the expected missing endpoint', () => pm.response.to.have.status(404));"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/non-existing"
       }
     }
   ]
